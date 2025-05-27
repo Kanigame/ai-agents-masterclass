@@ -1,0 +1,13 @@
+config :supavisor,
+  port: 4000,
+  db_host: "db",
+  db_port: 5432,
+  db_user: "supabase_admin",
+  db_name: "_supabase",
+  db_password: System.get_env("POSTGRES_PASSWORD"),
+  jwt_secret: System.get_env("JWT_SECRET"),
+  metrics_jwt_secret: System.get_env("JWT_SECRET"),
+  tenant_id: System.get_env("POOLER_TENANT_ID") || "local",
+  default_pool_size: String.to_integer(System.get_env("POOLER_DEFAULT_POOL_SIZE") || "10"),
+  max_client_conn: String.to_integer(System.get_env("POOLER_MAX_CLIENT_CONN") || "100"),
+  pool_mode: :transaction
