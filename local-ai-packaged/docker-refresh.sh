@@ -66,16 +66,16 @@ restart_docker_stacks() {
     docker compose down || true
 
     # Down nested stack
-    echo "⬇️ Bringing down nested stack (services/vector)…"
-    ( cd services/vector && docker compose down ) || true
+    echo "⬇️ Bringing down nested stack (supabase/docker)…"
+    ( cd supabase/docker && docker compose down ) || true
 
     # Up parent stack
     echo "⬆️ Bringing up parent stack…"
     docker compose up -d --build
 
     # Up nested stack
-    echo "⬆️ Bringing up nested stack (services/vector)…"
-    ( cd services/vector && docker compose up -d --build )
+    echo "⬆️ Bringing up nested stack (supabase/docker)…"
+    ( cd supabase/docker && docker compose up -d --build )
 
     echo "✅ Docker stacks restarted."
 }
