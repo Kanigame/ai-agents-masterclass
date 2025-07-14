@@ -139,6 +139,15 @@ else
   echo "⚠️ No .env.example found. Skipping env snapshot."
 fi
 
+echo "📦 Creating stack snapshot in $SNAPSHOT_DIR..."
+
+# === 🐳 1️⃣ Docker State ===
+echo "📦 Capturing Docker runtime state..."
+docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Ports}}" > $SNAPSHOT_DIR/docker_containers.txt
+docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}" > $SNAPSHOT_DIR/docker_images.txt
+docker volume ls > $SNAPSHOT_DIR/docker_volumes.txt
+echo "✅ Docker state saved: containers, images, volumes"
+
 echo "🎉 Stack snapshot completed!"
 echo "📁 Files created:"
 echo "  - $SNAPSHOT_DIR/supabase_schema.sql"
