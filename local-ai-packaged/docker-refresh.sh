@@ -18,13 +18,19 @@ update_git_repo() {
     git stash push -m "Auto stash before pulling main" || true
 
     # Fetch and merge latest main
-    git fetch origin
-    if git merge origin/main --no-edit; then
-        echo "✅ Merged origin/main into $current_branch"
-    else
-        echo "❌ Merge conflicts detected in $repo_path. Resolve manually."
-        exit 1
-    fi
+    # Fetch and detect default branch
+git fetch origin
+DEFAULT_BRANCH=$(git remote show origin | awk '/HEAD branch/ {print $NF}')
+
+echo "🌱 Default branch detected: $DEFAULT_BRANCH"
+
+# Merge default branch
+if git merge "origin/$DEFAULT_BRANCH" --no-edit; then
+    echo "✅ Merged origin/$DEFAULT_BRANCH into $current_branch"
+else
+    echo "❌ Merge conflicts detected in $repo_path. Resolve manually."
+    exit 1
+fi
 
     # Pop stashed changes (if any)
     git stash pop || true
