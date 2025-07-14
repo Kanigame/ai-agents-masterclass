@@ -115,8 +115,7 @@ services:
       - nocodb_meta:/usr/app/data
     depends_on:
       - redis
-    networks:
-      - shared
+    networks: [ "shared" ]
 
 # 🔗 Shared bridge network used by all services
 networks:
