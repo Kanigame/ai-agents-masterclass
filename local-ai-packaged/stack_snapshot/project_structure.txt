@@ -67,6 +67,7 @@
 ./supabase/supabase
 ./supabase/tsconfig.json
 ./supabase/turbo.json
+./supabase_full_backup.sql
 ./test.sh
 ./volumes
 ./volumes/pooler

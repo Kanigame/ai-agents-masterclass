@@ -130,6 +130,20 @@ CREATE SCHEMA vault;
 ALTER SCHEMA vault OWNER TO supabase_admin;
 
 --
+-- Name: http; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS http WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION http; Type: COMMENT; Schema: -; Owner: 
+--
+
+COMMENT ON EXTENSION http IS 'HTTP client for PostgreSQL, allows web page retrieval inside the database.';
+
+
+--
 -- Name: pg_graphql; Type: EXTENSION; Schema: -; Owner: -
 --
 
@@ -784,47 +798,48 @@ $$;
 ALTER FUNCTION pgbouncer.get_auth(p_usename text) OWNER TO supabase_admin;
 
 --
--- Name: notify_card_create(); Type: FUNCTION; Schema: public; Owner: supabase_admin
+-- Name: notify_zettel_change(); Type: FUNCTION; Schema: public; Owner: supabase_admin
 --
 
-CREATE FUNCTION public.notify_card_create() RETURNS trigger
+CREATE FUNCTION public.notify_zettel_change() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+begin
+  -- stamp the time first
+  NEW.updated_at := now();
+
+  -- then do whatever you were already doing:
+  perform pg_notify('zettel_change', row_to_json(NEW)::text);
+  return NEW;
+end;
+$$;
+
+
+ALTER FUNCTION public.notify_zettel_change() OWNER TO supabase_admin;
+
+--
+-- Name: notify_zettel_delete(); Type: FUNCTION; Schema: public; Owner: supabase_admin
+--
+
+CREATE FUNCTION public.notify_zettel_delete() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
-  PERFORM
-    net.http_post(
-      'http://host.docker.internal:5678/webhook/zettel-new-card',
-      json_build_object(
-        'type', 'INSERT',
-        'id', NEW.id,
-        'title', NEW.title,
-        'content', NEW.content,
-        'created_at', NEW.created_at
-      )::text,
-      'application/json'
-    );
-  RETURN NEW;
+  PERFORM net.http_request(
+    url := 'http://n8n:5678/webhook/zettel_vectorize',
+    method := 'POST',
+    headers := '{"Content-Type": "application/json"}'::jsonb,
+    body := jsonb_build_object(
+      'zettel_id', OLD.id,
+      'event', 'delete'
+    )::text
+  );
+  RETURN OLD;
 END;
 $$;
 
 
-ALTER FUNCTION public.notify_card_create() OWNER TO supabase_admin;
-
---
--- Name: update_card_embeddings_timestamp(); Type: FUNCTION; Schema: public; Owner: supabase_admin
---
-
-CREATE FUNCTION public.update_card_embeddings_timestamp() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-  NEW.updated_at := now();
-  RETURN NEW;
-END;
-$$;
-
-
-ALTER FUNCTION public.update_card_embeddings_timestamp() OWNER TO supabase_admin;
+ALTER FUNCTION public.notify_zettel_delete() OWNER TO supabase_admin;
 
 --
 -- Name: update_updated_at_column(); Type: FUNCTION; Schema: public; Owner: supabase_admin
@@ -2838,21 +2853,6 @@ COMMENT ON COLUMN auth.users.is_sso_user IS 'Auth: Set this column to true when 
 
 
 --
--- Name: card_embeddings; Type: TABLE; Schema: public; Owner: supabase_admin
---
-
-CREATE TABLE public.card_embeddings (
-    card_id uuid NOT NULL,
-    embedding public.vector(768),
-    model text DEFAULT 'nomic-embed-text'::text,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
-);
-
-
-ALTER TABLE public.card_embeddings OWNER TO supabase_admin;
-
---
 -- Name: zettel_cards; Type: TABLE; Schema: public; Owner: supabase_admin
 --
 
@@ -2869,9 +2869,9 @@ CREATE TABLE public.zettel_cards (
     compass_south_ids uuid[],
     compass_east_ids uuid[],
     compass_west_ids uuid[],
-    semantic_link_ids uuid[],
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
+    embedding public.vector(768),
     CONSTRAINT zettel_cards_type_check CHECK ((type = ANY (ARRAY['axiom'::text, 'fact'::text, 'hypothesis'::text, 'note'::text, 'question'::text]))),
     CONSTRAINT zettel_cards_validation_funnel_level_check CHECK (((validation_funnel_level >= 0) AND (validation_funnel_level <= 10))),
     CONSTRAINT zettel_cards_verification_level_check CHECK (((verification_level >= 0) AND (verification_level <= 100)))
@@ -3334,14 +3334,6 @@ ALTER TABLE ONLY auth.users
 
 ALTER TABLE ONLY auth.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
-
-
---
--- Name: card_embeddings card_embeddings_pkey; Type: CONSTRAINT; Schema: public; Owner: supabase_admin
---
-
-ALTER TABLE ONLY public.card_embeddings
-    ADD CONSTRAINT card_embeddings_pkey PRIMARY KEY (card_id);
 
 
 --
@@ -3841,24 +3833,24 @@ CREATE INDEX supabase_functions_hooks_request_id_idx ON supabase_functions.hooks
 
 
 --
--- Name: card_embeddings card_embeddings_set_timestamp; Type: TRIGGER; Schema: public; Owner: supabase_admin
+-- Name: zettel_cards trg_notify_zettel_change; Type: TRIGGER; Schema: public; Owner: supabase_admin
 --
 
-CREATE TRIGGER card_embeddings_set_timestamp BEFORE UPDATE ON public.card_embeddings FOR EACH ROW EXECUTE FUNCTION public.update_card_embeddings_timestamp();
-
-
---
--- Name: zettel_cards notify_card_insert; Type: TRIGGER; Schema: public; Owner: supabase_admin
---
-
-CREATE TRIGGER notify_card_insert AFTER INSERT ON public.zettel_cards FOR EACH ROW EXECUTE FUNCTION public.notify_card_create();
+CREATE TRIGGER trg_notify_zettel_change AFTER INSERT OR DELETE OR UPDATE ON public.zettel_cards FOR EACH ROW EXECUTE FUNCTION public.notify_zettel_change();
 
 
 --
--- Name: zettel_cards set_timestamp; Type: TRIGGER; Schema: public; Owner: supabase_admin
+-- Name: zettel_cards zettel_change_trigger; Type: TRIGGER; Schema: public; Owner: supabase_admin
 --
 
-CREATE TRIGGER set_timestamp BEFORE UPDATE ON public.zettel_cards FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER zettel_change_trigger BEFORE INSERT OR UPDATE ON public.zettel_cards FOR EACH ROW EXECUTE FUNCTION public.notify_zettel_change();
+
+
+--
+-- Name: zettel_cards zettel_vectorize_delete_trigger; Type: TRIGGER; Schema: public; Owner: supabase_admin
+--
+
+CREATE TRIGGER zettel_vectorize_delete_trigger AFTER DELETE ON public.zettel_cards FOR EACH ROW EXECUTE FUNCTION public.notify_zettel_delete();
 
 
 --
@@ -4014,14 +4006,6 @@ ALTER TABLE ONLY auth.sso_domains
 
 
 --
--- Name: card_embeddings card_embeddings_card_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: supabase_admin
---
-
-ALTER TABLE ONLY public.card_embeddings
-    ADD CONSTRAINT card_embeddings_card_id_fkey FOREIGN KEY (card_id) REFERENCES public.zettel_cards(id) ON DELETE CASCADE;
-
-
---
 -- Name: objects objects_bucketId_fkey; Type: FK CONSTRAINT; Schema: storage; Owner: supabase_storage_admin
 --
 
@@ -4156,19 +4140,6 @@ ALTER TABLE auth.sso_providers ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE auth.users ENABLE ROW LEVEL SECURITY;
-
---
--- Name: card_embeddings anon can insert embeddings; Type: POLICY; Schema: public; Owner: supabase_admin
---
-
-CREATE POLICY "anon can insert embeddings" ON public.card_embeddings FOR INSERT TO anon WITH CHECK (true);
-
-
---
--- Name: card_embeddings; Type: ROW SECURITY; Schema: public; Owner: supabase_admin
---
-
-ALTER TABLE public.card_embeddings ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: zettel_cards; Type: ROW SECURITY; Schema: public; Owner: supabase_admin
@@ -5250,6 +5221,16 @@ GRANT ALL ON FUNCTION public.binary_quantize(public.vector) TO service_role;
 
 
 --
+-- Name: FUNCTION bytea_to_text(data bytea); Type: ACL; Schema: public; Owner: supabase_admin
+--
+
+GRANT ALL ON FUNCTION public.bytea_to_text(data bytea) TO postgres;
+GRANT ALL ON FUNCTION public.bytea_to_text(data bytea) TO anon;
+GRANT ALL ON FUNCTION public.bytea_to_text(data bytea) TO authenticated;
+GRANT ALL ON FUNCTION public.bytea_to_text(data bytea) TO service_role;
+
+
+--
 -- Name: FUNCTION cosine_distance(public.halfvec, public.halfvec); Type: ACL; Schema: public; Owner: supabase_admin
 --
 
@@ -5500,6 +5481,146 @@ GRANT ALL ON FUNCTION public.hnswhandler(internal) TO service_role;
 
 
 --
+-- Name: FUNCTION http(request public.http_request); Type: ACL; Schema: public; Owner: supabase_admin
+--
+
+GRANT ALL ON FUNCTION public.http(request public.http_request) TO postgres;
+GRANT ALL ON FUNCTION public.http(request public.http_request) TO anon;
+GRANT ALL ON FUNCTION public.http(request public.http_request) TO authenticated;
+GRANT ALL ON FUNCTION public.http(request public.http_request) TO service_role;
+
+
+--
+-- Name: FUNCTION http_delete(uri character varying); Type: ACL; Schema: public; Owner: supabase_admin
+--
+
+GRANT ALL ON FUNCTION public.http_delete(uri character varying) TO postgres;
+GRANT ALL ON FUNCTION public.http_delete(uri character varying) TO anon;
+GRANT ALL ON FUNCTION public.http_delete(uri character varying) TO authenticated;
+GRANT ALL ON FUNCTION public.http_delete(uri character varying) TO service_role;
+
+
+--
+-- Name: FUNCTION http_delete(uri character varying, content character varying, content_type character varying); Type: ACL; Schema: public; Owner: supabase_admin
+--
+
+GRANT ALL ON FUNCTION public.http_delete(uri character varying, content character varying, content_type character varying) TO postgres;
+GRANT ALL ON FUNCTION public.http_delete(uri character varying, content character varying, content_type character varying) TO anon;
+GRANT ALL ON FUNCTION public.http_delete(uri character varying, content character varying, content_type character varying) TO authenticated;
+GRANT ALL ON FUNCTION public.http_delete(uri character varying, content character varying, content_type character varying) TO service_role;
+
+
+--
+-- Name: FUNCTION http_get(uri character varying); Type: ACL; Schema: public; Owner: supabase_admin
+--
+
+GRANT ALL ON FUNCTION public.http_get(uri character varying) TO postgres;
+GRANT ALL ON FUNCTION public.http_get(uri character varying) TO anon;
+GRANT ALL ON FUNCTION public.http_get(uri character varying) TO authenticated;
+GRANT ALL ON FUNCTION public.http_get(uri character varying) TO service_role;
+
+
+--
+-- Name: FUNCTION http_get(uri character varying, data jsonb); Type: ACL; Schema: public; Owner: supabase_admin
+--
+
+GRANT ALL ON FUNCTION public.http_get(uri character varying, data jsonb) TO postgres;
+GRANT ALL ON FUNCTION public.http_get(uri character varying, data jsonb) TO anon;
+GRANT ALL ON FUNCTION public.http_get(uri character varying, data jsonb) TO authenticated;
+GRANT ALL ON FUNCTION public.http_get(uri character varying, data jsonb) TO service_role;
+
+
+--
+-- Name: FUNCTION http_head(uri character varying); Type: ACL; Schema: public; Owner: supabase_admin
+--
+
+GRANT ALL ON FUNCTION public.http_head(uri character varying) TO postgres;
+GRANT ALL ON FUNCTION public.http_head(uri character varying) TO anon;
+GRANT ALL ON FUNCTION public.http_head(uri character varying) TO authenticated;
+GRANT ALL ON FUNCTION public.http_head(uri character varying) TO service_role;
+
+
+--
+-- Name: FUNCTION http_header(field character varying, value character varying); Type: ACL; Schema: public; Owner: supabase_admin
+--
+
+GRANT ALL ON FUNCTION public.http_header(field character varying, value character varying) TO postgres;
+GRANT ALL ON FUNCTION public.http_header(field character varying, value character varying) TO anon;
+GRANT ALL ON FUNCTION public.http_header(field character varying, value character varying) TO authenticated;
+GRANT ALL ON FUNCTION public.http_header(field character varying, value character varying) TO service_role;
+
+
+--
+-- Name: FUNCTION http_list_curlopt(); Type: ACL; Schema: public; Owner: supabase_admin
+--
+
+GRANT ALL ON FUNCTION public.http_list_curlopt() TO postgres;
+GRANT ALL ON FUNCTION public.http_list_curlopt() TO anon;
+GRANT ALL ON FUNCTION public.http_list_curlopt() TO authenticated;
+GRANT ALL ON FUNCTION public.http_list_curlopt() TO service_role;
+
+
+--
+-- Name: FUNCTION http_patch(uri character varying, content character varying, content_type character varying); Type: ACL; Schema: public; Owner: supabase_admin
+--
+
+GRANT ALL ON FUNCTION public.http_patch(uri character varying, content character varying, content_type character varying) TO postgres;
+GRANT ALL ON FUNCTION public.http_patch(uri character varying, content character varying, content_type character varying) TO anon;
+GRANT ALL ON FUNCTION public.http_patch(uri character varying, content character varying, content_type character varying) TO authenticated;
+GRANT ALL ON FUNCTION public.http_patch(uri character varying, content character varying, content_type character varying) TO service_role;
+
+
+--
+-- Name: FUNCTION http_post(uri character varying, data jsonb); Type: ACL; Schema: public; Owner: supabase_admin
+--
+
+GRANT ALL ON FUNCTION public.http_post(uri character varying, data jsonb) TO postgres;
+GRANT ALL ON FUNCTION public.http_post(uri character varying, data jsonb) TO anon;
+GRANT ALL ON FUNCTION public.http_post(uri character varying, data jsonb) TO authenticated;
+GRANT ALL ON FUNCTION public.http_post(uri character varying, data jsonb) TO service_role;
+
+
+--
+-- Name: FUNCTION http_post(uri character varying, content character varying, content_type character varying); Type: ACL; Schema: public; Owner: supabase_admin
+--
+
+GRANT ALL ON FUNCTION public.http_post(uri character varying, content character varying, content_type character varying) TO postgres;
+GRANT ALL ON FUNCTION public.http_post(uri character varying, content character varying, content_type character varying) TO anon;
+GRANT ALL ON FUNCTION public.http_post(uri character varying, content character varying, content_type character varying) TO authenticated;
+GRANT ALL ON FUNCTION public.http_post(uri character varying, content character varying, content_type character varying) TO service_role;
+
+
+--
+-- Name: FUNCTION http_put(uri character varying, content character varying, content_type character varying); Type: ACL; Schema: public; Owner: supabase_admin
+--
+
+GRANT ALL ON FUNCTION public.http_put(uri character varying, content character varying, content_type character varying) TO postgres;
+GRANT ALL ON FUNCTION public.http_put(uri character varying, content character varying, content_type character varying) TO anon;
+GRANT ALL ON FUNCTION public.http_put(uri character varying, content character varying, content_type character varying) TO authenticated;
+GRANT ALL ON FUNCTION public.http_put(uri character varying, content character varying, content_type character varying) TO service_role;
+
+
+--
+-- Name: FUNCTION http_reset_curlopt(); Type: ACL; Schema: public; Owner: supabase_admin
+--
+
+GRANT ALL ON FUNCTION public.http_reset_curlopt() TO postgres;
+GRANT ALL ON FUNCTION public.http_reset_curlopt() TO anon;
+GRANT ALL ON FUNCTION public.http_reset_curlopt() TO authenticated;
+GRANT ALL ON FUNCTION public.http_reset_curlopt() TO service_role;
+
+
+--
+-- Name: FUNCTION http_set_curlopt(curlopt character varying, value character varying); Type: ACL; Schema: public; Owner: supabase_admin
+--
+
+GRANT ALL ON FUNCTION public.http_set_curlopt(curlopt character varying, value character varying) TO postgres;
+GRANT ALL ON FUNCTION public.http_set_curlopt(curlopt character varying, value character varying) TO anon;
+GRANT ALL ON FUNCTION public.http_set_curlopt(curlopt character varying, value character varying) TO authenticated;
+GRANT ALL ON FUNCTION public.http_set_curlopt(curlopt character varying, value character varying) TO service_role;
+
+
+--
 -- Name: FUNCTION inner_product(public.halfvec, public.halfvec); Type: ACL; Schema: public; Owner: supabase_admin
 --
 
@@ -5680,13 +5801,23 @@ GRANT ALL ON FUNCTION public.l2_normalize(public.vector) TO service_role;
 
 
 --
--- Name: FUNCTION notify_card_create(); Type: ACL; Schema: public; Owner: supabase_admin
+-- Name: FUNCTION notify_zettel_change(); Type: ACL; Schema: public; Owner: supabase_admin
 --
 
-GRANT ALL ON FUNCTION public.notify_card_create() TO postgres;
-GRANT ALL ON FUNCTION public.notify_card_create() TO anon;
-GRANT ALL ON FUNCTION public.notify_card_create() TO authenticated;
-GRANT ALL ON FUNCTION public.notify_card_create() TO service_role;
+GRANT ALL ON FUNCTION public.notify_zettel_change() TO postgres;
+GRANT ALL ON FUNCTION public.notify_zettel_change() TO anon;
+GRANT ALL ON FUNCTION public.notify_zettel_change() TO authenticated;
+GRANT ALL ON FUNCTION public.notify_zettel_change() TO service_role;
+
+
+--
+-- Name: FUNCTION notify_zettel_delete(); Type: ACL; Schema: public; Owner: supabase_admin
+--
+
+GRANT ALL ON FUNCTION public.notify_zettel_delete() TO postgres;
+GRANT ALL ON FUNCTION public.notify_zettel_delete() TO anon;
+GRANT ALL ON FUNCTION public.notify_zettel_delete() TO authenticated;
+GRANT ALL ON FUNCTION public.notify_zettel_delete() TO service_role;
 
 
 --
@@ -5800,13 +5931,13 @@ GRANT ALL ON FUNCTION public.subvector(public.vector, integer, integer) TO servi
 
 
 --
--- Name: FUNCTION update_card_embeddings_timestamp(); Type: ACL; Schema: public; Owner: supabase_admin
+-- Name: FUNCTION text_to_bytea(data text); Type: ACL; Schema: public; Owner: supabase_admin
 --
 
-GRANT ALL ON FUNCTION public.update_card_embeddings_timestamp() TO postgres;
-GRANT ALL ON FUNCTION public.update_card_embeddings_timestamp() TO anon;
-GRANT ALL ON FUNCTION public.update_card_embeddings_timestamp() TO authenticated;
-GRANT ALL ON FUNCTION public.update_card_embeddings_timestamp() TO service_role;
+GRANT ALL ON FUNCTION public.text_to_bytea(data text) TO postgres;
+GRANT ALL ON FUNCTION public.text_to_bytea(data text) TO anon;
+GRANT ALL ON FUNCTION public.text_to_bytea(data text) TO authenticated;
+GRANT ALL ON FUNCTION public.text_to_bytea(data text) TO service_role;
 
 
 --
@@ -5817,6 +5948,36 @@ GRANT ALL ON FUNCTION public.update_updated_at_column() TO postgres;
 GRANT ALL ON FUNCTION public.update_updated_at_column() TO anon;
 GRANT ALL ON FUNCTION public.update_updated_at_column() TO authenticated;
 GRANT ALL ON FUNCTION public.update_updated_at_column() TO service_role;
+
+
+--
+-- Name: FUNCTION urlencode(string bytea); Type: ACL; Schema: public; Owner: supabase_admin
+--
+
+GRANT ALL ON FUNCTION public.urlencode(string bytea) TO postgres;
+GRANT ALL ON FUNCTION public.urlencode(string bytea) TO anon;
+GRANT ALL ON FUNCTION public.urlencode(string bytea) TO authenticated;
+GRANT ALL ON FUNCTION public.urlencode(string bytea) TO service_role;
+
+
+--
+-- Name: FUNCTION urlencode(data jsonb); Type: ACL; Schema: public; Owner: supabase_admin
+--
+
+GRANT ALL ON FUNCTION public.urlencode(data jsonb) TO postgres;
+GRANT ALL ON FUNCTION public.urlencode(data jsonb) TO anon;
+GRANT ALL ON FUNCTION public.urlencode(data jsonb) TO authenticated;
+GRANT ALL ON FUNCTION public.urlencode(data jsonb) TO service_role;
+
+
+--
+-- Name: FUNCTION urlencode(string character varying); Type: ACL; Schema: public; Owner: supabase_admin
+--
+
+GRANT ALL ON FUNCTION public.urlencode(string character varying) TO postgres;
+GRANT ALL ON FUNCTION public.urlencode(string character varying) TO anon;
+GRANT ALL ON FUNCTION public.urlencode(string character varying) TO authenticated;
+GRANT ALL ON FUNCTION public.urlencode(string character varying) TO service_role;
 
 
 --
@@ -6387,16 +6548,6 @@ GRANT ALL ON TABLE extensions.pg_stat_statements TO postgres WITH GRANT OPTION;
 --
 
 GRANT ALL ON TABLE extensions.pg_stat_statements_info TO postgres WITH GRANT OPTION;
-
-
---
--- Name: TABLE card_embeddings; Type: ACL; Schema: public; Owner: supabase_admin
---
-
-GRANT ALL ON TABLE public.card_embeddings TO postgres;
-GRANT ALL ON TABLE public.card_embeddings TO anon;
-GRANT ALL ON TABLE public.card_embeddings TO authenticated;
-GRANT ALL ON TABLE public.card_embeddings TO service_role;
 
 
 --

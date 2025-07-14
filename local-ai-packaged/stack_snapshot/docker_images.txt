@@ -1,6 +1,6 @@
 REPOSITORY                      TAG                      SIZE
+n8nio/n8n                       latest                   1.71GB
 flowiseai/flowise               latest                   4.76GB
-n8nio/n8n                       latest                   1.69GB
 ollama/ollama                   latest                   3.45GB
 redis                           7-alpine                 60.7MB
 ghcr.io/open-webui/open-webui   main                     6.87GB
