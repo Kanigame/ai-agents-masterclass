@@ -31,12 +31,6 @@
 ./stack_snapshot/docker_volumes.txt
 ./stack_snapshot/project_structure.txt
 ./stack_snapshot/supabase_schema.sql
-./status_packet
-./status_packet/agents.md
-./status_packet/containers.md
-./status_packet/db_schema.sql
-./status_packet/env.md
-./status_packet/structure.md
 ./supabase
 ./supabase/.cursor
 ./supabase/.dockerignore

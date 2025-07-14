@@ -187,15 +187,18 @@ echo "📂 Backing up n8n workflows..."
 N8N_BACKUP_DIR="$SNAPSHOT_DIR/n8n_flows"
 mkdir -p "$N8N_BACKUP_DIR"
 
-# Copy all n8n JSON workflows
-find . \( -path "./n8n-tool-workflows/*.json" -o -path "./flowise/*.json" -o -name "*n8n_Workflow.json" \) \
-    -exec cp {} "$N8N_BACKUP_DIR/" \;
+# === 🧠 4️⃣ Snapshot all live n8n workflows ===
+echo "📂 Exporting live n8n workflows from container..."
+N8N_EXPORT_FILE="$SNAPSHOT_DIR/n8n_workflows_snapshot.json"
 
-# Create a manifest file of the flows
-ls "$N8N_BACKUP_DIR" > "$SNAPSHOT_DIR/n8n_flows_manifest.txt"
+# Export all workflows using n8n CLI inside the container
+if docker exec -t n8n n8n export:workflow --all --output /tmp/n8n_workflows.json; then
+    docker cp n8n:/tmp/n8n_workflows.json "$N8N_EXPORT_FILE"
+    echo "✅ All live n8n workflows saved to $N8N_EXPORT_FILE"
+else
+    echo "⚠️ Could not export live n8n workflows (CLI not available?). Skipping."
+fi
 
-echo "✅ n8n workflows saved to $N8N_BACKUP_DIR"
-echo "📄 Manifest created: $SNAPSHOT_DIR/n8n_flows_manifest.txt"
 
 echo "🎉 Stack snapshot completed!"
 echo "📁 Files created:"
