@@ -22,10 +22,10 @@ check_and_log_if_unhealthy() {
 }
 
 # 🧼 Restart Supabase stack
-docker compose down -v --remove-orphans
+docker compose down --remove-orphans
 echo -e "\n🔄 Restarting Supabase stack..."
 cd supabase/docker || { echo "❌ Supabase path not found."; exit 1; }
-docker compose down -v --remove-orphans
+docker compose down --remove-orphans
 docker compose up -d --build --timeout=99999999999999
 
 echo -e "\n⏳ Waiting for core Supabase services to settle..."

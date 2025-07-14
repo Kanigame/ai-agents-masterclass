@@ -4,48 +4,48 @@ services:
     image: flowiseai/flowise
     container_name: flowise
     ports:
-      - "3001:3000"  # Expose Flowise UI
-    networks: ["shared"]
+      - "3001:3000" # Expose Flowise UI
+    networks: [ "shared" ]
     volumes:
-      - ~/.flowise:/root/.flowise  # Store Flowise config and flows
-    entrypoint: /bin/sh -c "sleep 3; flowise start"  # Delay to let dependencies settle
+      - ~/.flowise:/root/.flowise # Store Flowise config and flows
+    entrypoint: /bin/sh -c "sleep 3; flowise start" # Delay to let dependencies settle
 
   # 💬 Open-WebUI: Chat UI for Ollama (supports local models, RAG, more)
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
     container_name: open-webui
     ports:
-      - "3010:8080"  # Expose WebUI
+      - "3010:8080" # Expose WebUI
     volumes:
-      - open-webui:/app/backend/data  # Persistent data (e.g. conversations)
+      - open-webui:/app/backend/data # Persistent data (e.g. conversations)
     extra_hosts:
-      - "host.docker.internal:host-gateway"  # For container-host communication (esp. on Linux)
+      - "host.docker.internal:host-gateway" # For container-host communication (esp. on Linux)
     environment:
-      - OLLAMA_API_BASE_URL=http://ollama:11434  # Tells WebUI where to find your Ollama backend
-    networks: ["shared"]
+      - OLLAMA_API_BASE_URL=http://ollama:11434 # Tells WebUI where to find your Ollama backend
+    networks: [ "shared" ]
 
   # 🗄 PostgreSQL DB for n8n
   postgres:
     image: postgres:16-alpine
     container_name: n8n-db
     ports:
-      - "5433:5432"  # Expose DB port for tools like DBeaver (optional)
+      - "5433:5432" # Expose DB port for tools like DBeaver (optional)
     environment:
       - POSTGRES_USER=n8n
       - POSTGRES_PASSWORD=n8n
       - POSTGRES_DB=n8n
     volumes:
-      - postgres_storage:/var/lib/postgresql/data  # Persist DB state
-    networks: ["shared"]
+      - postgres_storage:/var/lib/postgresql/data # Persist DB state
+    networks: [ "shared" ]
 
   # 🧩 n8n: Low-code automation engine
   n8n:
     image: n8nio/n8n:latest
     container_name: n8n
     ports:
-      - "5678:5678"  # Main UI + API
+      - "5678:5678" # Main UI + API
     depends_on:
-      - postgres  # Needs DB before boot
+      - postgres # Needs DB before boot
     environment:
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
@@ -54,27 +54,27 @@ services:
       - DB_POSTGRESDB_PASSWORD=n8n
       - DB_POSTGRESDB_DATABASE=n8n
     volumes:
-      - n8n_data:/home/node/.n8n  # Persist workflows, creds, etc.
-      - ./n8n/backup:/backup  # Optional: mount a local backup folder
-      - ./shared:/data/shared  # Shared volume for files between services
-    networks: ["shared"]
+      - n8n_data:/home/node/.n8n # Persist workflows, creds, etc.
+      - ./n8n/backup:/backup # Optional: mount a local backup folder
+      - ./shared:/data/shared # Shared volume for files between services
+    networks: [ "shared" ]
 
   # ⚡ Redis: n8n uses this internally (e.g. queues)
   redis:
     image: redis:7-alpine
     container_name: redis
     ports:
-      - "6379:6379"  # Optional: exposed for inspection
-    networks: ["shared"]
+      - "6379:6379" # Optional: exposed for inspection
+    networks: [ "shared" ]
 
   # 🧠 Ollama: Local LLM inference (models run here)
   ollama:
     image: ollama/ollama
     container_name: ollama
     ports:
-      - "11434:11434"  # Ollama REST API
+      - "11434:11434" # Ollama REST API
     volumes:
-      - ollama_data:/root/.ollama  # Model cache and history
+      - ollama_data:/root/.ollama # Model cache and history
     entrypoint: /bin/sh
     command:
       - -c
@@ -91,20 +91,37 @@ services:
         ollama pull nomic-embed-text
 
         tail -f /dev/null  # Keep the container alive
-    networks: ["shared"]
+    networks: [ "shared" ]
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
               count: 1
-              capabilities: [gpu]  # Enable GPU support
-    runtime: nvidia  # Use NVIDIA runtime for CUDA
+              capabilities: [ gpu ] # Enable GPU support
+    runtime: nvidia # Use NVIDIA runtime for CUDA
+
+  nocodb:
+    image: nocodb/nocodb:latest
+    container_name: nocodb
+    restart: unless-stopped
+    ports:
+      - "8088:8080"
+    environment:
+      NC_DB: "pg://${SUPA_HOST}:${SUPA_PORT}?u=${SUPA_USER}&p=${SUPA_PASS}&d=${SUPA_DB}"
+      NC_AUTH_JWT_SECRET: "super-secret-noco-key"
+
+    volumes:
+      - nocodb_meta:/usr/app/data
+    depends_on:
+      - redis
+    networks:
+      - shared
 
 # 🔗 Shared bridge network used by all services
 networks:
   shared:
-    external: true  # This network must already exist (or be created manually)
+    external: true # This network must already exist (or be created manually)
 
 # 💾 Persistent volumes for each service
 volumes:
@@ -122,8 +139,12 @@ volumes:
 
   ollama_data:
     labels:
-      purpose: "ollama-models"  # This is where models are stored
+      purpose: "ollama-models" # This is where models are stored
 
   ollama_models:
     labels:
-      purpose: "ollama-models"  # Optional second volume if you want to separate cache vs. models
+      purpose: "ollama-models" # Optional second volume if you want to separate cache vs. models
+
+  nocodb_meta:
+    labels:
+      purpose: "nocodb-meta" # NocoDB metadata storage
