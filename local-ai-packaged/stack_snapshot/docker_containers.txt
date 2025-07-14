@@ -1,21 +1,21 @@
 NAMES                            IMAGE                                    PORTS
 supabase-storage                 supabase/storage-api:v1.24.7             5000/tcp
-supabase-studio                  supabase/studio:2025.06.30-sha-6f5982d   0.0.0.0:54323->3000/tcp, [::]:54323->3000/tcp
-supabase-auth                    supabase/gotrue:v2.176.1                 
 supabase-pooler                  supabase/supavisor:2.5.6                 0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp, 0.0.0.0:6543->6543/tcp, [::]:6543->6543/tcp
 supabase-meta                    supabase/postgres-meta:v0.89.3           8080/tcp
-supabase-edge-functions          supabase/edge-runtime:v1.67.4            
-supabase-kong                    kong:2.8.1                               0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp, 0.0.0.0:8443->8443/tcp, [::]:8443->8443/tcp
 realtime-dev.supabase-realtime   supabase/realtime:v2.34.47               
+supabase-kong                    kong:2.8.1                               0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp, 0.0.0.0:8443->8443/tcp, [::]:8443->8443/tcp
+supabase-studio                  supabase/studio:2025.06.30-sha-6f5982d   0.0.0.0:54323->3000/tcp, [::]:54323->3000/tcp
+supabase-edge-functions          supabase/edge-runtime:v1.67.4            
+supabase-auth                    supabase/gotrue:v2.176.1                 
 supabase-rest                    postgrest/postgrest:v12.2.12             3000/tcp
 supabase-analytics               supabase/logflare:1.14.2                 0.0.0.0:4000->4000/tcp, [::]:4000->4000/tcp
 supabase-db                      supabase/postgres:15.8.1.060             5432/tcp
 supabase-vector                  timberio/vector:0.28.1-alpine            
 supabase-imgproxy                darthsim/imgproxy:v3.8.0                 8080/tcp
-n8n                              n8nio/n8n:latest                         0.0.0.0:5678->5678/tcp, [::]:5678->5678/tcp
 nocodb                           nocodb/nocodb:latest                     0.0.0.0:8088->8080/tcp, [::]:8088->8080/tcp
+n8n                              n8nio/n8n:latest                         0.0.0.0:5678->5678/tcp, [::]:5678->5678/tcp
+redis                            redis:7-alpine                           0.0.0.0:6379->6379/tcp, [::]:6379->6379/tcp
 open-webui                       ghcr.io/open-webui/open-webui:main       0.0.0.0:3010->8080/tcp, [::]:3010->8080/tcp
 n8n-db                           postgres:16-alpine                       0.0.0.0:5433->5432/tcp, [::]:5433->5432/tcp
-redis                            redis:7-alpine                           0.0.0.0:6379->6379/tcp, [::]:6379->6379/tcp
 flowise                          flowiseai/flowise                        0.0.0.0:3001->3000/tcp, [::]:3001->3000/tcp
 ollama                           ollama/ollama                            0.0.0.0:11434->11434/tcp, [::]:11434->11434/tcp

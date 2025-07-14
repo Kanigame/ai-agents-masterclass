@@ -26,6 +26,9 @@
 ./src
 ./src/agents
 ./stack_snapshot
+./stack_snapshot/docker_containers.txt
+./stack_snapshot/docker_images.txt
+./stack_snapshot/docker_volumes.txt
 ./stack_snapshot/project_structure.txt
 ./stack_snapshot/supabase_schema.sql
 ./status_packet

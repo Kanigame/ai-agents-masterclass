@@ -182,6 +182,21 @@ docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}" > $SNAPSHOT_
 docker volume ls > $SNAPSHOT_DIR/docker_volumes.txt
 echo "✅ Docker state saved: containers, images, volumes"
 
+# === 🧠 4️⃣ Backup n8n workflows ===
+echo "📂 Backing up n8n workflows..."
+N8N_BACKUP_DIR="$SNAPSHOT_DIR/n8n_flows"
+mkdir -p "$N8N_BACKUP_DIR"
+
+# Copy all n8n JSON workflows
+find . \( -path "./n8n-tool-workflows/*.json" -o -path "./flowise/*.json" -o -name "*n8n_Workflow.json" \) \
+    -exec cp {} "$N8N_BACKUP_DIR/" \;
+
+# Create a manifest file of the flows
+ls "$N8N_BACKUP_DIR" > "$SNAPSHOT_DIR/n8n_flows_manifest.txt"
+
+echo "✅ n8n workflows saved to $N8N_BACKUP_DIR"
+echo "📄 Manifest created: $SNAPSHOT_DIR/n8n_flows_manifest.txt"
+
 echo "🎉 Stack snapshot completed!"
 echo "📁 Files created:"
 echo "  - $SNAPSHOT_DIR/supabase_schema.sql"
