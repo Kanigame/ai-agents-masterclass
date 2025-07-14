@@ -1,0 +1,8 @@
+DRIVER    VOLUME NAME
+local     8bef98c3e00211431426353f16c5188642e8617cf8be0dd9819b32e3256382db
+local     local-ai-packaged_n8n_data
+local     local-ai-packaged_nocodb_meta
+local     local-ai-packaged_ollama_data
+local     local-ai-packaged_open-webui
+local     local-ai-packaged_postgres_storage
+local     supabase_db-config

@@ -2,6 +2,40 @@
 
 set -e  # Exit on error
 set -o pipefail
+# 🐳 Utility: Ensure Docker is running
+ensure_docker_running() {
+    echo "🔍 Checking if Docker is running..."
+    if ! docker info >/dev/null 2>&1; then
+        echo "🐳 Docker is not running. Attempting to start it..."
+
+        # Try starting Docker Desktop on macOS/Windows
+        if command -v open &>/dev/null && [ -d "/Applications/Docker.app" ]; then
+            open -a Docker
+        elif command -v powershell.exe &>/dev/null; then
+            powershell.exe -Command "Start-Process 'Docker Desktop' -Verb runAs"
+        else
+            echo "❌ Could not auto-start Docker. Please start it manually."
+            exit 1
+        fi
+
+        # Wait for Docker to be ready
+        echo "⏳ Waiting for Docker to start..."
+        retries=30
+        while ! docker info >/dev/null 2>&1; do
+            sleep 2
+            retries=$((retries-1))
+            if [ "$retries" -le 0 ]; then
+                echo "❌ Docker failed to start after waiting. Aborting."
+                exit 1
+            fi
+            echo "…still waiting for Docker (${retries}s left)"
+        done
+        echo "✅ Docker is up and running."
+    else
+        echo "✅ Docker is already running."
+    fi
+}
+ensure_docker_running
 
 # 🏃‍♂️ Utility: Update a git repo
 update_git_repo() {
