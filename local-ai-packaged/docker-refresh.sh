@@ -182,11 +182,6 @@ docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}" > $SNAPSHOT_
 docker volume ls > $SNAPSHOT_DIR/docker_volumes.txt
 echo "✅ Docker state saved: containers, images, volumes"
 
-# === 🧠 4️⃣ Backup n8n workflows ===
-echo "📂 Backing up n8n workflows..."
-N8N_BACKUP_DIR="$SNAPSHOT_DIR/n8n_flows"
-mkdir -p "$N8N_BACKUP_DIR"
-
 # === 🧠 4️⃣ Snapshot all live n8n workflows ===
 echo "📂 Exporting live n8n workflows from container..."
 N8N_EXPORT_FILE="$SNAPSHOT_DIR/n8n_workflows_snapshot.json"
