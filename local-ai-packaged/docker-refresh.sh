@@ -53,9 +53,10 @@ fi
 pull_docker_images() {
     echo "🛠 Pulling all current docker images…"
     docker images --format '{{.Repository}}:{{.Tag}}' \
-    | awk -F: '$1 != "" && $2 != ""' \
-    | xargs -r -n1 docker pull
-    echo "✅ Docker images pulled."
+| grep -v "<none>:<none>" \
+| awk -F: '$1 != "" && $2 != ""' \
+| xargs -r -n1 docker pull
+
 }
 
 # 🐳 Utility: Restart docker stacks
