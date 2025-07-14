@@ -12,7 +12,7 @@ ensure_docker_running() {
         if command -v open &>/dev/null && [ -d "/Applications/Docker.app" ]; then
             open -a Docker
         elif command -v powershell.exe &>/dev/null; then
-            powershell.exe -Command "Start-Process 'Docker Desktop' -Verb runAs"
+            powershell.exe -Command "& 'C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe' start --quiet"
         else
             echo "❌ Could not auto-start Docker. Please start it manually."
             exit 1
