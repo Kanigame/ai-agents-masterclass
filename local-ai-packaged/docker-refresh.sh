@@ -104,3 +104,43 @@ restart_docker_stacks
 prune_docker
 
 echo "🎉 All done. Everything is fresh and shiny."
+# === Setup ===
+SNAPSHOT_DIR="stack_snapshot"
+mkdir -p $SNAPSHOT_DIR
+
+echo "📦 Creating stack snapshot in $SNAPSHOT_DIR..."
+
+# === 1️⃣ Dump Supabase Schema ===
+echo "🗄 Dumping Supabase schema..."
+docker exec -t supabase-db pg_dump -U postgres --schema-only > $SNAPSHOT_DIR/supabase_schema.sql
+if [ $? -eq 0 ]; then
+  echo "✅ Supabase schema saved to $SNAPSHOT_DIR/supabase_schema.sql"
+else
+  echo "❌ Failed to dump Supabase schema."
+fi
+
+# === 2️⃣ Dump Project Folder Structure ===
+echo "📂 Saving project folder structure..."
+if command -v tree &> /dev/null
+then
+  tree -L 2 -I "node_modules|.git" > $SNAPSHOT_DIR/project_structure.txt
+else
+  echo "ℹ️ 'tree' not installed. Falling back to 'find'..."
+  find . -maxdepth 2 -not -path "./node_modules/*" -not -path "./.git/*" > $SNAPSHOT_DIR/project_structure.txt
+fi
+echo "✅ Project structure saved to $SNAPSHOT_DIR/project_structure.txt"
+
+# === 3️⃣ Copy Sanitized .env (if exists) ===
+if [ -f ".env.example" ]; then
+  echo "🔐 Copying sanitized .env.example..."
+  cp .env.example $SNAPSHOT_DIR/env_sanitized.txt
+  echo "✅ Sanitized env saved to $SNAPSHOT_DIR/env_sanitized.txt"
+else
+  echo "⚠️ No .env.example found. Skipping env snapshot."
+fi
+
+echo "🎉 Stack snapshot completed!"
+echo "📁 Files created:"
+echo "  - $SNAPSHOT_DIR/supabase_schema.sql"
+echo "  - $SNAPSHOT_DIR/project_structure.txt"
+echo "  - $SNAPSHOT_DIR/env_sanitized.txt (if available)"
